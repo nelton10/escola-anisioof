@@ -1,18 +1,20 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
-// O seu bloco try/catch e configurações do Firebase entram exclusivamente aqui
 const firebaseConfig = {
-  apiKey: "AIzaSyCb2Cmqwivdgb_YgCUQbcx43S38QYRDapA",
-  authDomain: "gestao-anisio.firebaseapp.com",
-  projectId: "gestao-anisio",
-  storageBucket: "gestao-anisio.firebasestorage.app",
-  messagingSenderId: "946435999048",
-  appId: "1:946435999048:web:a3cae6ed73c21a30b59f7d"
+  // Insira suas credenciais aqui
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const appId = 'gestao-anisio-v1';
+const db = getFirestore(app);
+
+// ATENÇÃO: Isso permite que o app funcione sem internet na escola
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.error("Múltiplas abas abertas, persistência falhou.");
+    } else if (err.code == 'unimplemented') {
+        console.error("Navegador não suporta persistência.");
+    }
+});
+
+export { db };
