@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-
-// 1. NÚCLEO E CONFIGURAÇÃO
 import { auth, db, appId } from './firebase/config';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, query, orderBy, limit, where } from 'firebase/firestore';
 
-// 2. IMPORTAÇÃO DOS COMPONENTES (Caminhos da sua barra lateral)
 import LoginScreen from './components/auth/LoginScreen';
 import PainelSaidas from './components/features/PainelSaidas';
 import GestaoOcorrencias from './components/features/GestaoOcorrencias';
@@ -24,7 +21,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('saidas');
   const [usernameInput, setUsernameInput] = useState('');
   
-  // Estados de Dados
   const [alunos, setAlunos] = useState([]);
   const [config, setConfig] = useState({});
   const [records, setRecords] = useState([]);
@@ -32,7 +28,6 @@ export default function App() {
   const [coordinationQueue, setCoordinationQueue] = useState([]);
   const [libraryQueue, setLibraryQueue] = useState([]);
 
-  // MONITOR DE AUTENTICAÇÃO (Não desloga no F5)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -43,16 +38,14 @@ export default function App() {
         setUser(null);
         localStorage.clear();
       }
-      setLoading(false); 
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // MONITOR DE DADOS (Blindagem contra excesso de leituras)
   useEffect(() => {
     if (!user) return;
     
-    // Configurações e Alunos (Lê apenas 1 documento)
     const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), (d) => {
       if (d.exists()) {
         setConfig(d.data());
@@ -60,21 +53,18 @@ export default function App() {
       }
     });
 
-    // TRAVA DE SEGURANÇA: Limitamos tudo para evitar os 278k de leituras
-    const qHistory = query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), orderBy('rawTimestamp', 'desc'), limit(50));
+    // FILTRO DE HISTÓRICO: Admin vê tudo, Professor vê apenas o dele
+    const qHistory = userRole === 'admin' 
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), orderBy('rawTimestamp', 'desc'), limit(100))
+      : query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), where("professor", "==", usernameInput), orderBy('rawTimestamp', 'desc'), limit(50));
+
     const unsubHistory = onSnapshot(qHistory, (s) => setRecords(s.docs.map(d => ({ ...d.data(), id: d.id }))));
-
-    const qExits = query(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), limit(30));
-    const unsubExits = onSnapshot(qExits, (s) => setActiveExits(s.docs.map(d => ({ ...d.data(), id: d.id }))));
-
-    const qCoord = query(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), limit(20));
-    const unsubCoord = onSnapshot(qCoord, (s) => setCoordinationQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
-
-    const qLib = query(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), limit(20));
-    const unsubLib = onSnapshot(qLib, (s) => setLibraryQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
+    const unsubExits = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), limit(30)), (s) => setActiveExits(s.docs.map(d => ({ ...d.data(), id: d.id }))));
+    const unsubCoord = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), limit(20)), (s) => setCoordinationQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
+    const unsubLib = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), limit(20)), (s) => setLibraryQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
 
     return () => { unsubConfig(); unsubHistory(); unsubExits(); unsubCoord(); unsubLib(); };
-  }, [user]);
+  }, [user, userRole, usernameInput]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -88,11 +78,7 @@ export default function App() {
 
   const turmasExistentes = [...new Set(alunos.map(a => a.turma))].sort();
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-600 border-opacity-20 border-t-indigo-600"></div>
-    </div>
-  );
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-600"></div></div>;
 
   if (!user) return <LoginScreen setUserRole={setUserRole} config={config} setUsernameInput={setUsernameInput} />;
 
@@ -101,19 +87,15 @@ export default function App() {
       <nav className="px-4 py-3 sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b overflow-x-auto no-scrollbar">
         <div className="flex gap-2 min-w-max">
           {[
-            {id: 'saidas', label: 'Saídas'},
-            {id: 'ocorrencias', label: 'Ocorrências'},
-            {id: 'diario', label: 'Diário'},
-            {id: 'historico', label: 'Histórico'},
-            {id: 'atrasos', label: 'Atrasos'},
-            {id: 'coord', label: 'Coordenação'},
-            {id: 'medidas', label: 'Biblioteca'},
-            {id: 'pesquisa', label: 'Pesquisa'},
+            {id: 'saidas', label: 'Saídas'}, {id: 'ocorrencias', label: 'Ocorrências'},
+            {id: 'diario', label: 'Diário'}, {id: 'historico', label: 'Histórico'},
+            {id: 'atrasos', label: 'Atrasos'}, {id: 'coord', label: 'Coordenação'},
+            {id: 'medidas', label: 'Biblioteca'}, {id: 'pesquisa', label: 'Pesquisa'},
             {id: 'admin', label: 'Gestão', adminOnly: true}
           ].map((tab) => (
             (!tab.adminOnly || userRole === 'admin') && (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} 
-                className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                 {tab.label}
               </button>
             )
@@ -129,7 +111,7 @@ export default function App() {
         {activeTab === 'historico' && <Historico records={records} />}
         {activeTab === 'atrasos' && <EntradasTardias alunos={alunos} usernameInput={usernameInput} turmasExistentes={turmasExistentes} />}
         {activeTab === 'coord' && <FilaCoordenacao coordinationQueue={coordinationQueue} usernameInput={usernameInput} />}
-        {activeTab === 'medidas' && <Biblioteca libraryQueue={libraryQueue} />}
+        {activeTab === 'medidas' && <Biblioteca libraryQueue={libraryQueue} usernameInput={usernameInput} />}
         {activeTab === 'pesquisa' && <PesquisaAlunos alunos={alunos} records={records} />}
         {activeTab === 'admin' && <DashboardAdmin alunos={alunos} records={records} config={config} saveConfig={saveConfig} />}
       </main>
