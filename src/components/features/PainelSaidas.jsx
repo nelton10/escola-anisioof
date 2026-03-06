@@ -1,109 +1,53 @@
 import React, { useState } from 'react';
-import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore'; // Importamos deleteDoc
+import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, appId } from '../../firebase/config';
-import { LogOut, UserCheck, Clock, CheckCircle2 } from 'lucide-react';
+import { Clock, UserCheck, CheckCircle2 } from 'lucide-react';
 
 export default function PainelSaidas({ alunos, usernameInput, activeExits }) {
   const [busca, setBusca] = useState('');
 
-  // 1. REGISTRAR SAÍDA: Cria um registro temporário
   const registrarSaida = async (aluno, tipo) => {
     try {
-      // Adiciona na fila de saídas ativas
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), {
-        alunoId: aluno.id,
-        nome: aluno.nome,
-        turma: aluno.turma,
-        tipo: tipo,
-        professor: usernameInput,
-        timestamp: new Date().toLocaleTimeString('pt-BR'),
-        rawTimestamp: Date.now()
+        alunoId: aluno.id, nome: aluno.nome, turma: aluno.turma, tipo, professor: usernameInput, timestamp: new Date().toLocaleTimeString('pt-BR'), rawTimestamp: Date.now()
       });
-
-      // Registra no histórico permanente (que já limitamos a 50 itens no App.jsx)
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
-        acao: `Saída: ${tipo}`,
-        aluno: aluno.nome,
-        turma: aluno.turma,
-        professor: usernameInput,
-        timestamp: new Date().toLocaleTimeString('pt-BR'),
-        rawTimestamp: Date.now()
+        acao: `Saída: ${tipo}`, aluno: aluno.nome, turma: aluno.turma, professor: usernameInput, timestamp: new Date().toLocaleTimeString('pt-BR'), rawTimestamp: Date.now()
       });
-      
       setBusca('');
-    } catch (e) {
-      alert("Erro ao registrar saída.");
-    }
+    } catch (e) { alert("Erro ao registrar."); }
   };
 
-  // 2. REGISTRAR RETORNO: A chave para economizar sua cota!
-  const registrarRetorno = async (saidaId) => {
-    try {
-      // O segredo: DELETAR o documento da fila ativa
-      // Isso remove o aluno da tela e impede que ele gaste leituras no futuro
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeExits', saidaId));
-    } catch (e) {
-      console.error("Erro ao registrar retorno:", e);
-    }
+  const registrarRetorno = async (id) => {
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activeExits', id));
   };
 
-  const filtrados = alunos.filter(a => a.nome.toLowerCase().includes(busca.toLowerCase())).slice(0, 8);
+  const filtrados = alunos.filter(a => a.nome.toLowerCase().includes(busca.toLowerCase())).slice(0, 5);
 
   return (
     <div className="space-y-6">
-      {/* BUSCA DE ALUNO */}
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-        <input 
-          className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-indigo-500 font-bold" 
-          placeholder="Nome do aluno para saída..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
-        
-        {busca && (
-          <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2">
-            {filtrados.map(aluno => (
-              <div key={aluno.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                <div className="max-w-[150px]">
-                  <p className="font-black text-slate-800 text-sm truncate">{aluno.nome}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">{aluno.turma}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => registrarSaida(aluno, 'Banheiro')} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 active:scale-95 transition-all"><Clock size={18}/></button>
-                  <button onClick={() => registrarSaida(aluno, 'Bebedouro')} className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-200 active:scale-95 transition-all"><UserCheck size={18}/></button>
-                </div>
+      <input className="w-full p-5 rounded-3xl border-none shadow-inner bg-white font-bold" placeholder="Buscar para saída..." value={busca} onChange={e => setBusca(e.target.value)} />
+      {busca && (
+        <div className="space-y-2">
+          {filtrados.map(aluno => (
+            <div key={aluno.id} className="p-4 bg-white rounded-2xl flex justify-between items-center shadow-sm">
+              <p className="font-black text-xs">{aluno.nome}</p>
+              <div className="flex gap-2">
+                <button onClick={() => registrarSaida(aluno, 'Banheiro')} className="p-3 bg-blue-500 text-white rounded-xl"><Clock size={16}/></button>
+                <button onClick={() => registrarSaida(aluno, 'Bebedouro')} className="p-3 bg-emerald-500 text-white rounded-xl"><UserCheck size={16}/></button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* LISTA DE ALUNOS FORA DE SALA */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Alunos fora de sala ({activeExits.length})</h4>
-        {activeExits.length === 0 ? (
-          <div className="py-10 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-            <p className="font-bold text-slate-300">Todos os alunos estão em sala.</p>
-          </div>
-        ) : (
-          activeExits.map(saida => (
-            <div key={saida.id} className="bg-white p-5 rounded-3xl shadow-xl border border-indigo-50 flex justify-between items-center animate-in zoom-in-95 duration-300">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2 h-2 rounded-full ${saida.tipo === 'Banheiro' ? 'bg-blue-500' : 'bg-emerald-500'} animate-pulse`}></span>
-                  <p className="font-black text-slate-800">{saida.nome}</p>
-                </div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Saída: {saida.timestamp} • {saida.tipo}</p>
-              </div>
-              <button 
-                onClick={() => registrarRetorno(saida.id)} 
-                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-2xl font-black text-[10px] hover:bg-emerald-600 transition-colors shadow-lg shadow-slate-200"
-              >
-                <CheckCircle2 size={16} /> RETORNOU
-              </button>
             </div>
-          ))
-        )}
+          ))}
+        </div>
+      )}
+      <div className="space-y-3">
+        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fora de Sala ({activeExits.length})</h4>
+        {activeExits.map(s => (
+          <div key={s.id} className="bg-white p-5 rounded-3xl shadow-md border border-indigo-50 flex justify-between items-center">
+            <div><p className="font-black text-slate-800 text-sm">{s.nome}</p><p className="text-[10px] font-bold text-slate-400 uppercase">{s.tipo} • {s.timestamp}</p></div>
+            <button onClick={() => registrarRetorno(s.id)} className="p-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] flex items-center gap-1"><CheckCircle2 size={14}/> RETORNOU</button>
+          </div>
+        ))}
       </div>
     </div>
   );
