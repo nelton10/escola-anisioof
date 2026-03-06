@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // 1. NÚCLEO E CONFIGURAÇÃO
 import { auth, db, appId } from './firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 
 // 2. IMPORTAÇÃO DOS COMPONENTES (Caminhos validados pela sua estrutura)
@@ -19,7 +19,7 @@ import EntradasTardias from './components/features/EntradasTardias';
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true); // FREIO DE SEGURANÇA: Evita deslogar no refresh
   const [userRole, setUserRole] = useState('professor');
   const [activeTab, setActiveTab] = useState('saidas');
   const [usernameInput, setUsernameInput] = useState('');
@@ -31,13 +31,26 @@ export default function App() {
   const [coordinationQueue, setCoordinationQueue] = useState([]);
   const [libraryQueue, setLibraryQueue] = useState([]);
 
-  // Monitor de Autenticação
+  // MONITOR DE AUTENTICAÇÃO (Persistência de Sessão)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        // Recupera o papel e nome salvos no navegador para não perder no F5
+        const savedRole = localStorage.getItem('userRole') || 'professor';
+        const savedName = localStorage.getItem('username') || 'Professor';
+        setUserRole(savedRole);
+        setUsernameInput(savedName);
+      } else {
+        setUser(null);
+        localStorage.clear(); // Limpa se deslogar
+      }
+      setLoading(false); // O Firebase já respondeu, podemos liberar a tela
+    });
     return () => unsubscribe();
   }, []);
 
-  // Monitor de Dados (Otimizado para não estourar a cota de leitura)
+  // MONITOR DE DADOS (Otimizado com limites de leitura)
   useEffect(() => {
     if (!user) return;
     
@@ -49,7 +62,7 @@ export default function App() {
       }
     });
 
-    // O FREIO DE MÃO: Busca apenas as últimas 100 ações para economizar leituras
+    // O FREIO DE MÃO: Busca apenas as últimas 100 ações para não estourar a cota de 278k novamente
     const historyQuery = query(
       collection(db, 'artifacts', appId, 'public', 'data', 'history'), 
       orderBy('rawTimestamp', 'desc'), 
@@ -57,7 +70,6 @@ export default function App() {
     );
     const unsubHistory = onSnapshot(historyQuery, (s) => setRecords(s.docs.map(d => ({ ...d.data(), id: d.id }))));
 
-    // Listeners de tempo real para as filas ativas
     const unsubExits = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), (s) => setActiveExits(s.docs.map(d => ({ ...d.data(), id: d.id }))));
     const unsubCoord = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), (s) => setCoordinationQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
     const unsubLibrary = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), (s) => setLibraryQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
@@ -69,10 +81,31 @@ export default function App() {
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), newData, { merge: true });
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    localStorage.clear();
+    window.location.reload();
+  };
+
   const turmasExistentes = [...new Set(alunos.map(a => a.turma))].sort();
 
-  if (!isAuthenticated) {
-    return <LoginScreen setIsAuthenticated={setIsAuthenticated} setUserRole={setUserRole} config={config} setUsernameInput={setUsernameInput} />;
+  // TELA DE CARREGAMENTO INICIAL
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-600 border-opacity-20 border-t-indigo-600"></div>
+        <p className="mt-4 text-slate-400 font-black text-xs uppercase tracking-widest">Sincronizando Anísio Teixeira...</p>
+      </div>
+    );
+  }
+
+  // SE NÃO ESTIVER LOGADO NO FIREBASE
+  if (!user) {
+    return <LoginScreen 
+              setUserRole={setUserRole} 
+              config={config} 
+              setUsernameInput={setUsernameInput} 
+            />;
   }
 
   return (
@@ -101,10 +134,10 @@ export default function App() {
               </button>
             )
           ))}
+          <button onClick={handleLogout} className="px-4 py-2 rounded-xl text-[11px] font-black bg-red-50 text-red-500">Sair</button>
         </div>
       </nav>
 
-      {/* ÁREA DE CONTEÚDO */}
       <main className="flex-1 px-4 pb-24 pt-4 max-w-2xl mx-auto w-full">
         {activeTab === 'saidas' && <PainelSaidas alunos={alunos} usernameInput={usernameInput} activeExits={activeExits} />}
         {activeTab === 'ocorrencias' && <GestaoOcorrencias alunos={alunos} usernameInput={usernameInput} turmasExistentes={turmasExistentes} />}
@@ -114,7 +147,7 @@ export default function App() {
         {activeTab === 'coord' && <FilaCoordenacao coordinationQueue={coordinationQueue} usernameInput={usernameInput} />}
         {activeTab === 'medidas' && <Biblioteca libraryQueue={libraryQueue} />}
         {activeTab === 'pesquisa' && <PesquisaAlunos alunos={alunos} records={records} />}
-        {activeTab === 'admin' && <DashboardAdmin alunos={alunos} records={records} config={config} saveConfig={saveConfig} turmasExistentes={turmasExistentes} />}
+        {activeTab === 'admin' && <DashboardAdmin alunos={alunos} records={records} config={config} saveConfig={saveConfig} />}
       </main>
     </div>
   );
