@@ -9,7 +9,7 @@ export const useFirebaseSync = () => {
     const { user, userRole } = useAuth();
     const {
         setConfig, setAlunos, setActiveExits, setRecords,
-        setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos,
+        setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations,
         isFirstLoad, prevCoordQueueRef
     } = useAppContext();
 
@@ -106,7 +106,13 @@ export const useFirebaseSync = () => {
             (err) => console.error("Erro Avisos Snapshot:", err)
         );
 
-        return () => { unsubConfig(); unsubExits(); unsubHistory(); unsubCoord(); unsubLibrary(); unsubSuspensions(); unsubAvisos(); };
-    }, [user, userRole, setConfig, setAlunos, setActiveExits, setRecords, setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos]);
+        const qEval = query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), orderBy('rawTimestamp', 'desc'), limit(50));
+        const unsubEval = onSnapshot(qEval,
+            (s) => setEvaluations(s.docs.map(d => ({ ...d.data(), id: d.id }))),
+            (err) => console.error("Erro Evaluations Snapshot:", err)
+        );
+
+        return () => { unsubConfig(); unsubExits(); unsubHistory(); unsubCoord(); unsubLibrary(); unsubSuspensions(); unsubAvisos(); unsubEval(); };
+    }, [user, userRole, setConfig, setAlunos, setActiveExits, setRecords, setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations]);
 
 };

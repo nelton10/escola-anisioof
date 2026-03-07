@@ -18,6 +18,7 @@ export const AppProvider = ({ children }) => {
     const [libraryQueue, setLibraryQueue] = useState([]);
     const [suspensions, setSuspensions] = useState([]);
     const [avisos, setAvisos] = useState([]);
+    const [evaluations, setEvaluations] = useState([]);
 
     // Refs para controle interno e avisos
     const prevCoordQueueRef = useRef([]);
@@ -74,6 +75,7 @@ export const AppProvider = ({ children }) => {
         libraryQueue, setLibraryQueue,
         suspensions, setSuspensions,
         avisos, setAvisos,
+        evaluations, setEvaluations,
 
         // Utilitários de dados
         getTodayExitsCount, getSuspendedInTurma

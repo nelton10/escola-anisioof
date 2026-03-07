@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, UserCheck, TimerOff, DoorOpen, ListChecks, FileSpreadsheet, MessageSquarePlus, ShieldCheck, UserPlus, Search, Settings, ShieldAlert, ArrowRight, X } from 'lucide-react';
+import { LogOut, UserCheck, TimerOff, DoorOpen, ListChecks, FileSpreadsheet, MessageSquarePlus, ShieldCheck, UserPlus, Search, Settings, ShieldAlert, ArrowRight, X, Star } from 'lucide-react';
 
 // Contexts
 import { AppProvider, useAppContext } from './contexts/AppContext';
@@ -33,6 +33,7 @@ import { AvisosTab } from './views/Tabs/AvisosTab';
 import { AnaliseTab } from './views/Tabs/AnaliseTab';
 import { ConfigTab } from './views/Tabs/ConfigTab';
 import { PesquisaTab } from './views/Tabs/PesquisaTab';
+import { AvaliacaoTab } from './views/Tabs/AvaliacaoTab';
 
 const NavItem = ({ active, icon: Icon, label, onClick, badge, alert }) => (
   <button onClick={onClick} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-800'}`}>
@@ -59,6 +60,7 @@ const DesktopSidebar = ({ currentTab, setCurrentTab, stats }) => {
         <NavItem active={currentTab === 'saidas'} icon={UserCheck} label="Ativar Saída" onClick={() => setCurrentTab('saidas')} badge={stats.saidasAtivas} />
         {!isAluno && <NavItem active={currentTab === 'ocorrencias'} icon={ShieldAlert} label="Ocorrência" onClick={() => setCurrentTab('ocorrencias')} />}
         {!isAluno && <NavItem active={currentTab === 'atrasos'} icon={TimerOff} label="Registar Atraso" onClick={() => setCurrentTab('atrasos')} />}
+        {!isAluno && <NavItem active={currentTab === 'avaliacao'} icon={Star} label="Avaliador de Aula" onClick={() => setCurrentTab('avaliacao')} />}
         <div className="my-4 h-px bg-slate-100"></div>
         <NavItem active={currentTab === 'historico'} icon={ListChecks} label="Histórico" onClick={() => setCurrentTab('historico')} />
         <NavItem active={currentTab === 'pesquisa'} icon={Search} label="Pesquisa Diária" onClick={() => setCurrentTab('pesquisa')} />
@@ -110,6 +112,7 @@ const MobileNav = ({ currentTab, setCurrentTab, isMenuOpen, setIsMenuOpen, stats
                 <NavItem active={currentTab === 'coordenacao'} icon={DoorOpen} label="Coordenação" onClick={() => { setCurrentTab('coordenacao'); setIsMenuOpen(false); }} badge={stats.coordQueue} alert={stats.coordQueue > 0} />
                 <NavItem active={currentTab === 'biblioteca'} icon={FileSpreadsheet} label="Biblioteca" onClick={() => { setCurrentTab('biblioteca'); setIsMenuOpen(false); }} badge={stats.libQueue} />
                 <NavItem active={currentTab === 'atrasos'} icon={TimerOff} label="Registar Atraso" onClick={() => { setCurrentTab('atrasos'); setIsMenuOpen(false); }} />
+                <NavItem active={currentTab === 'avaliacao'} icon={Star} label="Avaliador de Aula" onClick={() => { setCurrentTab('avaliacao'); setIsMenuOpen(false); }} />
               </>
             )}
             {userRole === 'admin' && (
@@ -180,6 +183,7 @@ const CoreApp = () => {
                 {currentTab === 'analise' && 'Análise Estratégica'}
                 {currentTab === 'config' && 'Configurações'}
                 {currentTab === 'pesquisa' && 'Pesquisa Rápida'}
+                {currentTab === 'avaliacao' && 'Avaliação de Aula'}
               </h2>
               <p className="text-sm font-bold text-slate-400 uppercase tracking-widest pl-1">
                 {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -197,6 +201,7 @@ const CoreApp = () => {
           {currentTab === 'analise' && userRole === 'admin' && <AnaliseTab />}
           {currentTab === 'config' && userRole === 'admin' && <ConfigTab />}
           {currentTab === 'pesquisa' && <PesquisaTab />}
+          {currentTab === 'avaliacao' && userRole !== 'aluno' && <AvaliacaoTab />}
         </div>
       </main>
 
