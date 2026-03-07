@@ -1,5 +1,5 @@
 import React from 'react';
-import { DoorOpen, CheckCircle2, UserX } from 'lucide-react';
+import { DoorOpen, CheckCircle2, UserX, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../services/firebase';
 import { useAppContext } from '../../contexts/AppContext';
@@ -9,7 +9,7 @@ import { useModals } from '../../contexts/ModalContext';
 export const CoordenacaoTab = () => {
     const { usernameInput } = useAuth();
     const { coordinationQueue, suspensions } = useAppContext();
-    const { showNotification, setSuspensionModal, setEndSuspensionModal } = useModals();
+    const { showNotification, setSuspensionModal, setEndSuspensionModal, setViewPhotoModal } = useModals();
 
     const handleCoordComplete = async (aluno) => {
         try {
@@ -17,7 +17,8 @@ export const CoordenacaoTab = () => {
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
                 alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
                 categoria: 'coordenação', detalhe: `Atendimento Concluído. Motivo original: ${aluno.motivo}`,
-                timestamp: ts, rawTimestamp: raw, professor: usernameInput
+                timestamp: ts, rawTimestamp: raw, professor: usernameInput,
+                fotoUrl: aluno.fotoUrl || null
             });
             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue', aluno.id));
             showNotification("Atendimento finalizado!");
@@ -36,11 +37,19 @@ export const CoordenacaoTab = () => {
                             <div key={c.id} className="bg-amber-50/80 p-4 rounded-2xl border border-amber-200/60 shadow-sm relative overflow-hidden group">
                                 <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400"></div>
                                 <div className="flex justify-between items-start pl-2">
-                                    <div>
+                                    <div className="flex-1">
                                         <h4 className="font-extrabold text-sm text-amber-950 mb-1">{c.alunoNome}</h4>
                                         <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2"><span className="bg-amber-100 px-1.5 py-0.5 rounded-md">{c.turma}</span> • {c.timestamp}</p>
                                         <p className="text-xs font-semibold text-amber-900 bg-amber-100/50 p-2 rounded-xl mb-3"><span className="opacity-70 mr-1">Motivo:</span> {c.motivo}</p>
                                     </div>
+                                    {c.fotoUrl && (
+                                        <button
+                                            onClick={() => setViewPhotoModal(c.fotoUrl)}
+                                            className="p-3 bg-amber-100/80 text-amber-700 rounded-xl hover:bg-amber-200 transition-all border border-amber-200"
+                                        >
+                                            <ImageIcon size={20} />
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="flex gap-2 pl-2">
                                     <button onClick={() => handleCoordComplete(c)} className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-400 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><CheckCircle2 size={16} /> Resolver</button>
