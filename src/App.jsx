@@ -1,141 +1,120 @@
 import React, { useState, useEffect } from 'react';
+import { db } from './firebase'; // Importando o banco que configuramos
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  query, 
+  orderBy, 
+  serverTimestamp 
+} from 'firebase/firestore';
 
-// 1. NÚCLEO E CONFIGURAÇÃO
-import { auth, db, appId } from './firebase/config';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, query, orderBy, limit, where } from 'firebase/firestore';
-
-// 2. IMPORTAÇÃO DOS COMPONENTES (Caminhos da sua barra lateral)
-import LoginScreen from './components/auth/LoginScreen';
-import PainelSaidas from './components/features/PainelSaidas';
-import GestaoOcorrencias from './components/features/GestaoOcorrencias';
-import DiarioBordo from './components/features/DiarioBordo';
-import DashboardAdmin from './components/features/DashboardAdmin';
-import Historico from './components/features/Historico';
-import FilaCoordenacao from './components/features/FilaCoordenacao';
-import Biblioteca from './components/features/Biblioteca';
-import PesquisaAlunos from './components/features/PesquisaAlunos';
-import EntradasTardias from './components/features/EntradasTardias';
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState('professor');
-  const [activeTab, setActiveTab] = useState('saidas');
-  const [usernameInput, setUsernameInput] = useState('');
-  
-  // Estados de Dados
+function App() {
   const [alunos, setAlunos] = useState([]);
-  const [config, setConfig] = useState({});
-  const [records, setRecords] = useState([]);
-  const [activeExits, setActiveExits] = useState([]);
-  const [coordinationQueue, setCoordinationQueue] = useState([]);
-  const [libraryQueue, setLibraryQueue] = useState([]);
+  const [alunoSelecionado, setAlunoSelecionado] = useState("");
+  const [status, setStatus] = useState({ tipo: '', msg: '' });
 
-  // MONITOR DE AUTENTICAÇÃO (Persistência de Sessão)
+  // BUSCA DE ALUNOS - Com fechamento de conexão (Crucial!)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        setUserRole(localStorage.getItem('userRole') || 'professor');
-        setUsernameInput(localStorage.getItem('username') || 'Professor');
-      } else {
-        setUser(null);
-        localStorage.clear();
-      }
-      setLoading(false); 
+    const q = query(collection(db, "alunos"), orderBy("nome", "asc"));
+    
+    // Abrindo a conexão em tempo real
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const dados = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAlunos(dados);
+    }, (error) => {
+      console.error("Erro ao buscar alunos:", error);
+      setStatus({ tipo: 'erro', msg: 'Erro ao carregar lista de alunos.' });
     });
-    return () => unsubscribe(); // Fecha o monitor de login ao sair
+
+    // REGRA DE OURO: Quando o app fecha, a conexão com o Firebase é cortada aqui.
+    // Isso evita que você gaste sua cota à toa!
+    return () => unsubscribe();
   }, []);
 
-  // MONITOR DE DADOS (Blindagem contra os 22 listeners e excesso de leituras)
-  useEffect(() => {
-    if (!user || !usernameInput) return;
-    
-    // CONFIGURAÇÕES E ALUNOS
-    const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), (d) => {
-      if (d.exists()) {
-        setConfig(d.data());
-        if (d.data().alunosList) setAlunos(d.data().alunosList);
-      }
-    });
+  const registrarSaida = async (e) => {
+    e.preventDefault();
 
-    // FILTRO DE HISTÓRICO: Professor vê apenas o dele para economizar cota
-    const qHistory = userRole === 'admin' 
-      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), orderBy('rawTimestamp', 'desc'), limit(50))
-      : query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), where("professor", "==", usernameInput), orderBy('rawTimestamp', 'desc'), limit(30));
+    if (!alunoSelecionado) {
+      setStatus({ tipo: 'erro', msg: 'Por favor, selecione um aluno!' });
+      return;
+    }
 
-    const unsubHistory = onSnapshot(qHistory, (s) => setRecords(s.docs.map(d => ({ ...d.data(), id: d.id }))));
+    try {
+      setStatus({ tipo: 'info', msg: 'Registrando...' });
 
-    // FILAS ATIVAS (Limitadas para evitar o consumo de 292k)
-    const unsubExits = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), limit(30)), (s) => setActiveExits(s.docs.map(d => ({ ...d.data(), id: d.id }))));
-    const unsubCoord = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), limit(20)), (s) => setCoordinationQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
-    const unsubLib = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), limit(20)), (s) => setLibraryQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))));
+      // Salvando no Firebase
+      await addDoc(collection(db, "saidas"), {
+        nomeAluno: alunoSelecionado,
+        dataSaida: serverTimestamp(), // Usa a hora do servidor, não do celular (mais seguro)
+        escola: "EEMTI Anísio Teixeira"
+      });
 
-    // O LACRE: Encerra todas as conexões quando o usuário desloga ou fecha a página
-    // Isso impede que o número de listeners suba para 22 novamente
-    return () => { 
-      unsubConfig(); 
-      unsubHistory(); 
-      unsubExits(); 
-      unsubCoord(); 
-      unsubLib(); 
-    };
-  }, [user, userRole, usernameInput]);
+      setAlunoSelecionado("");
+      setStatus({ tipo: 'sucesso', msg: 'Saída registrada com sucesso!' });
+      
+      // Limpa a mensagem após 3 segundos
+      setTimeout(() => setStatus({ tipo: '', msg: '' }), 3000);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.clear();
-    window.location.reload();
+    } catch (error) {
+      console.error("Erro ao registrar:", error);
+      setStatus({ tipo: 'erro', msg: 'Falha ao registrar. O sistema tentará novamente offline.' });
+    }
   };
-
-  const saveConfig = async (newData) => {
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), newData, { merge: true });
-  };
-
-  const turmasExistentes = [...new Set(alunos.map(a => a.turma))].sort();
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-600"></div>
-    </div>
-  );
-
-  if (!user) return <LoginScreen setUserRole={setUserRole} config={config} setUsernameInput={setUsernameInput} />;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <nav className="px-4 py-3 sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b overflow-x-auto no-scrollbar">
-        <div className="flex gap-2 min-w-max">
-          {[
-            {id: 'saidas', label: 'Saídas'}, {id: 'ocorrencias', label: 'Ocorrências'},
-            {id: 'diario', label: 'Diário'}, {id: 'historico', label: 'Histórico'},
-            {id: 'atrasos', label: 'Atrasos'}, {id: 'coord', label: 'Coordenação'},
-            {id: 'medidas', label: 'Biblioteca'}, {id: 'pesquisa', label: 'Pesquisa'},
-            {id: 'admin', label: 'Gestão', adminOnly: true}
-          ].map((tab) => (
-            (!tab.adminOnly || userRole === 'admin') && (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} 
-                className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                {tab.label}
-              </button>
-            )
-          ))}
-          <button onClick={handleLogout} className="px-4 py-2 rounded-xl text-[11px] font-black bg-red-50 text-red-500">Sair</button>
-        </div>
-      </nav>
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1>Gestão Anísio Teixeira</h1>
+        <p>Controle de Saída de Alunos</p>
+      </header>
 
-      <main className="flex-1 px-4 pb-24 pt-4 max-w-2xl mx-auto w-full">
-        {activeTab === 'saidas' && <PainelSaidas alunos={alunos} usernameInput={usernameInput} activeExits={activeExits} />}
-        {activeTab === 'ocorrencias' && <GestaoOcorrencias alunos={alunos} usernameInput={usernameInput} turmasExistentes={turmasExistentes} />}
-        {activeTab === 'diario' && <DiarioBordo turmasExistentes={turmasExistentes} usernameInput={usernameInput} />}
-        {activeTab === 'historico' && <Historico records={records} />}
-        {activeTab === 'atrasos' && <EntradasTardias alunos={alunos} usernameInput={usernameInput} turmasExistentes={turmasExistentes} />}
-        {activeTab === 'coord' && <FilaCoordenacao coordinationQueue={coordinationQueue} usernameInput={usernameInput} />}
-        {activeTab === 'medidas' && <Biblioteca libraryQueue={libraryQueue} />}
-        {activeTab === 'pesquisa' && <PesquisaAlunos alunos={alunos} records={records} />}
-        {activeTab === 'admin' && <DashboardAdmin alunos={alunos} records={records} config={config} saveConfig={saveConfig} />}
+      <main style={styles.main}>
+        {status.msg && (
+          <div style={{...styles.alerta, backgroundColor: status.tipo === 'erro' ? '#ffcccc' : '#ccffcc'}}>
+            {status.msg}
+          </div>
+        )}
+
+        <form onSubmit={registrarSaida} style={styles.form}>
+          <label htmlFor="aluno">Nome do Aluno:</label>
+          <input
+            id="aluno"
+            list="lista-alunos"
+            value={alunoSelecionado}
+            onChange={(e) => setAlunoSelecionado(e.target.value)}
+            placeholder="Comece a digitar o nome..."
+            style={styles.input}
+            autoComplete="off"
+          />
+          
+          <datalist id="lista-alunos">
+            {alunos.map((aluno) => (
+              <option key={aluno.id} value={aluno.nome} />
+            ))}
+          </datalist>
+
+          <button type="submit" style={styles.button}>
+            Confirmar Saída
+          </button>
+        </form>
       </main>
     </div>
   );
 }
+
+// Estilização Básica (Para não precisar de CSS externo por enquanto)
+const styles = {
+  container: { fontFamily: 'sans-serif', maxWidth: '500px', margin: '0 auto', padding: '20px' },
+  header: { textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid #007bff', paddingBottom: '10px' },
+  main: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  form: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  input: { padding: '12px', fontSize: '16px', borderRadius: '5px', border: '1px solid #ccc' },
+  button: { padding: '15px', fontSize: '18px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer' },
+  alerta: { padding: '10px', borderRadius: '5px', textAlign: 'center', fontWeight: 'bold' }
+};
+
+export default App;
