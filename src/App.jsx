@@ -97,7 +97,7 @@ function App() {
         <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #eee' }}>
           <span>{s.nomeAluno}</span>
           <button 
-            onClick={() => registrarVolta(s.id)} // <--- A SETA () => É OBRIGATÓRIA AQUI!
+            onClick={() => registrarVolta(s.id)} 
             style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px' }}
           >
             Marcar Volta
