@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, FileUp, Trash2, ArrowRight, Check, DatabaseBackup, Download, Plus, UserPlus, Edit } from 'lucide-react';
+import { Settings, FileUp, Trash2, ArrowRight, Check, DatabaseBackup, Download, Plus, UserPlus, Edit, TableIcon } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppContext } from '../../contexts/AppContext';
 import { useModals } from '../../contexts/ModalContext';
+import * as XLSX from 'xlsx';
 
 export const ConfigTab = () => {
     const { userRole } = useAuth();
-    const { config, alunos, turmasExistentes } = useAppContext();
+    const { config, alunos, turmasExistentes, records, suspensions } = useAppContext();
     const { showNotification, setDeleteStudentsModal, setDeleteTurma } = useModals();
 
     const [limitInput, setLimitInput] = useState(config.exitLimitMinutes?.toString() || '15');
@@ -117,6 +118,65 @@ export const ConfigTab = () => {
         } catch (e) { showNotification("Erro ao atualizar turma."); }
     };
 
+    const handleExportExcel = () => {
+        try {
+            // --- Aba 1: Histórico de Ocorrências ---
+            const ocorrenciasData = (records || [])
+                .sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0))
+                .map(r => ({
+                    'Data/Hora': r.timestamp || '',
+                    'Aluno': r.alunoNome || '',
+                    'Turma': r.turma || '',
+                    'Categoria': r.categoria || '',
+                    'Detalhe / Observação': r.detalhe || '',
+                    'Registado por': r.professor || '',
+                }));
+
+            // --- Aba 2: Suspensões ---
+            const suspensoesData = (suspensions || [])
+                .sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0))
+                .map(s => ({
+                    'Data/Hora Início': s.timestamp || s.startTimestamp || '',
+                    'Data/Hora Fim': s.endTimestamp || '',
+                    'Aluno': s.alunoNome || '',
+                    'Turma': s.turma || '',
+                    'Motivo / Observação': s.motivo || s.detalhe || '',
+                    'Responsável': s.professor || '',
+                    'Status': s.active ? 'Ativa' : 'Encerrada',
+                }));
+
+            const wb = XLSX.utils.book_new();
+
+            if (ocorrenciasData.length > 0) {
+                const ws1 = XLSX.utils.json_to_sheet(ocorrenciasData);
+                // Ajustar largura das colunas
+                ws1['!cols'] = [
+                    { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 16 }, { wch: 60 }, { wch: 20 }
+                ];
+                XLSX.utils.book_append_sheet(wb, ws1, 'Ocorrências e Histórico');
+            }
+
+            if (suspensoesData.length > 0) {
+                const ws2 = XLSX.utils.json_to_sheet(suspensoesData);
+                ws2['!cols'] = [
+                    { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 60 }, { wch: 20 }, { wch: 10 }
+                ];
+                XLSX.utils.book_append_sheet(wb, ws2, 'Suspensões');
+            }
+
+            if (ocorrenciasData.length === 0 && suspensoesData.length === 0) {
+                return showNotification("Nenhum dado para exportar.");
+            }
+
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `relatorio_escola_${date}.xlsx`);
+            showNotification("Relatório Excel gerado com sucesso!");
+        } catch (e) {
+            console.error(e);
+            showNotification("Erro ao gerar o relatório.");
+        }
+    };
+
     const saveSettings = async () => {
         if (userRole !== 'admin') return;
         try {
@@ -196,6 +256,35 @@ export const ConfigTab = () => {
                 </div>
                 <input type="file" ref={backupInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
                 <p className="text-[10px] text-slate-400 font-bold uppercase text-center">O backup contém toda a lista de alunos e turmas.</p>
+            </div>
+
+            {/* EXPORTAR RELATÓRIO */}
+            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-[2rem] border border-white shadow-xl shadow-slate-200/40 space-y-4">
+                <h3 className="text-sm font-extrabold flex items-center gap-2 text-slate-800 tracking-tight"><TableIcon size={18} strokeWidth={2.5} /> Exportar Relatório Completo</h3>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    Gera um ficheiro Excel (.xlsx) com duas abas: todo o histórico de ocorrências (com observações) e todas as suspensões.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100">
+                        <p className="font-extrabold text-2xl text-indigo-700">{records?.length || 0}</p>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-wider mt-1">Ocorrências</p>
+                    </div>
+                    <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100">
+                        <p className="font-extrabold text-2xl text-rose-700">{suspensions?.length || 0}</p>
+                        <p className="text-[10px] font-black text-rose-400 uppercase tracking-wider mt-1">Suspensões</p>
+                    </div>
+                    <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100">
+                        <p className="font-extrabold text-2xl text-emerald-700">{alunos?.length || 0}</p>
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wider mt-1">Alunos</p>
+                    </div>
+                </div>
+                <button
+                    onClick={handleExportExcel}
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-2xl font-extrabold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-[0.98] transition-all text-sm"
+                >
+                    <TableIcon size={20} />
+                    Exportar para Excel (.xlsx)
+                </button>
             </div>
 
             {/* GESTÃO MANUAL DE ALUNOS */}
