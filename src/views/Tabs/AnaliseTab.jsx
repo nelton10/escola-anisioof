@@ -1,10 +1,14 @@
-import React, { useMemo, useState } from 'react';
-import { Activity, TrendingUp, TrendingDown, Users, Award, AlertCircle, ChevronRight, BarChart3, Search, Star } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Activity, TrendingUp, TrendingDown, Users, Award, AlertCircle, ChevronRight, BarChart3, Search, Star, Printer, FileDown } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
 
-export const AnaliseTab = () => {
+export const AnaliseTab = ({ onStudentClick }) => {
     const { records, turmasExistentes, evaluations } = useAppContext();
     const [selectedTurma, setSelectedTurma] = useState('');
+
+    const handlePrint = () => {
+        window.print();
+    };
 
     const stats = useMemo(() => {
         if (!records) return {
@@ -102,15 +106,43 @@ export const AnaliseTab = () => {
     return (
         <div className="space-y-6 flex-1 w-full animate-in fade-in duration-500 pb-10">
             {/* Título e Header */}
-            <div className="flex items-center justify-between px-2">
+            <div className="flex items-center justify-between px-2 no-print">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                     <BarChart3 className="text-indigo-600" size={24} strokeWidth={2.5} />
                     Painel de Inteligência
                 </h2>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full border">
-                    Análise em Tempo Real
+                <div className="flex gap-2">
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                    >
+                        <Printer size={14} /> Imprimir Relatório
+                    </button>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-2 rounded-xl border">
+                        Análise em Tempo Real
+                    </div>
                 </div>
             </div>
+
+            {/* Estilos de Impressão */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @media print {
+                    .no-print { display: none !important; }
+                    body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                    .bg-white, .bg-slate-50, .bg-slate-900 { 
+                        background: white !important; 
+                        color: black !important; 
+                        box-shadow: none !important;
+                        border: 1px solid #ddd !important;
+                    }
+                    .text-white, .text-indigo-400, .text-slate-400 { color: black !important; }
+                    .rounded-[3rem], .rounded-[2.5rem], .rounded-[2rem] { border-radius: 8px !important; }
+                    select, button { display: none !important; }
+                    .grid { display: block !important; }
+                    .grid > div { margin-bottom: 1.5rem !important; page-break-inside: avoid; }
+                }
+            `}} />
 
             {/* Cards de Visão Geral */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -154,13 +186,17 @@ export const AnaliseTab = () => {
                         {stats.topInfratores.length === 0 ? (
                             <p className="text-xs font-bold text-slate-400 text-center py-4 italic">Sem registros críticos.</p>
                         ) : stats.topInfratores.map((a, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white transition-colors">
+                            <button
+                                key={idx}
+                                onClick={() => onStudentClick && onStudentClick(a.nome)}
+                                className="w-full flex items-center justify-between p-3.5 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group/item"
+                            >
                                 <div className="flex items-center gap-3">
                                     <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-600 rounded-lg text-[10px] font-black">{idx + 1}</span>
-                                    <span className="text-xs font-extrabold text-slate-700">{a.nome}</span>
+                                    <span className="text-xs font-extrabold text-slate-700 group-hover/item:text-indigo-600">{a.nome}</span>
                                 </div>
-                                <span className="text-xs font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-lg">{a.count}</span>
-                            </div>
+                                <span className="text-xs font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-lg group-hover/item:bg-indigo-50 group-hover/item:text-indigo-500">{a.count}</span>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -173,13 +209,17 @@ export const AnaliseTab = () => {
                         {stats.topMeritos.length === 0 ? (
                             <p className="text-xs font-bold text-slate-400 text-center py-4 italic">Incentive os alunos!</p>
                         ) : stats.topMeritos.map((a, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white transition-colors">
+                            <button
+                                key={idx}
+                                onClick={() => onStudentClick && onStudentClick(a.nome)}
+                                className="w-full flex items-center justify-between p-3.5 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group/item"
+                            >
                                 <div className="flex items-center gap-3">
                                     <span className="w-6 h-6 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-lg text-[10px] font-black">{idx + 1}</span>
-                                    <span className="text-xs font-extrabold text-slate-700">{a.nome}</span>
+                                    <span className="text-xs font-extrabold text-slate-700 group-hover/item:text-indigo-600">{a.nome}</span>
                                 </div>
-                                <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-lg">{a.count}</span>
-                            </div>
+                                <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-lg group-hover/item:bg-indigo-50 group-hover/item:text-indigo-500">{a.count}</span>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -208,8 +248,8 @@ export const AnaliseTab = () => {
                                 </div>
                                 <div className="space-y-2">
                                     <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner border border-slate-200/50">
-                                        <div className="h-full bg-rose-500 transition-all duration-1000 shadow-[0_0_10px_rgba(244,63,94,0.3)]" style={{ width: `${percOc}%` }}></div>
-                                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${percMe}%` }}></div>
+                                        <div className="h-full bg-rose-500 transition-all duration-1000 shadow-[0_0_10px_rgba(244,63,94,0.3)]" style={{ width: `${percOc}% ` }}></div>
+                                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${percMe}% ` }}></div>
                                     </div>
                                     <div className="flex justify-between text-[8px] font-black uppercase tracking-wider">
                                         <span className="text-rose-500 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-rose-500 rounded-full"></div> {t.ocorrencias} Oc.</span>
@@ -275,13 +315,17 @@ export const AnaliseTab = () => {
                                     <h4 className="text-[9px] uppercase font-black text-slate-400 mb-4 flex items-center gap-2 tracking-widest"><Users size={12} strokeWidth={3} /> Protagonistas</h4>
                                     <div className="space-y-2">
                                         {turmaDetail.topAlunos.map((a, i) => (
-                                            <div key={i} className="flex justify-between items-center bg-slate-800 p-2.5 rounded-xl border border-slate-700/50 hover:bg-slate-700 transition-all group">
-                                                <span className="text-[10px] font-bold truncate max-w-[140px] group-hover:text-indigo-300">{a.nome}</span>
+                                            <button
+                                                key={i}
+                                                onClick={() => onStudentClick && onStudentClick(a.nome)}
+                                                className="w-full flex justify-between items-center bg-slate-800 p-2.5 rounded-xl border border-slate-700/50 hover:bg-slate-700 transition-all group/subitem cursor-pointer"
+                                            >
+                                                <span className="text-[10px] font-bold truncate max-w-[140px] group-hover/subitem:text-indigo-300">{a.nome}</span>
                                                 <div className="flex items-center gap-1">
                                                     <span className="text-[10px] font-black text-indigo-400">{a.count}</span>
-                                                    <ChevronRight size={12} className="text-slate-600 group-hover:translate-x-0.5 transition-transform" />
+                                                    <ChevronRight size={12} className="text-slate-600 group-hover/subitem:translate-x-0.5 transition-transform" />
                                                 </div>
-                                            </div>
+                                            </button>
                                         ))}
                                         {turmaDetail.topAlunos.length === 0 && <p className="text-[10px] text-slate-600 italic py-4 text-center">Nenhum evento registrado.</p>}
                                     </div>

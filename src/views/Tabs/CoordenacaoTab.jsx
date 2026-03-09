@@ -25,6 +25,26 @@ export const CoordenacaoTab = () => {
         } catch (e) { showNotification("Erro ao finalizar."); }
     };
 
+    const handleLibraryReferral = async (aluno) => {
+        try {
+            const now = new Date(); const ts = now.toLocaleString('pt-PT'); const raw = now.getTime();
+            // 1. Registrar no histórico
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
+                alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                categoria: 'coordenação', detalhe: `Encaminhado à Biblioteca. Motivo original: ${aluno.motivo}`,
+                timestamp: ts, rawTimestamp: raw, professor: usernameInput
+            });
+            // 2. Adicionar à fila da biblioteca
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), {
+                alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                timestamp: ts, rawTimestamp: raw, professor: usernameInput
+            });
+            // 3. Remover da fila da coordenação
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue', aluno.id));
+            showNotification("Aluno encaminhado para a Biblioteca!");
+        } catch (e) { showNotification("Erro ao encaminhar."); }
+    };
+
     return (
         <div className="space-y-6 flex-1 w-full animate-in fade-in duration-300">
             <div className="bg-white/90 backdrop-blur-sm p-6 rounded-[2rem] border border-white shadow-xl shadow-slate-200/40 space-y-4">
@@ -51,9 +71,10 @@ export const CoordenacaoTab = () => {
                                         </button>
                                     )}
                                 </div>
-                                <div className="flex gap-2 pl-2">
-                                    <button onClick={() => handleCoordComplete(c)} className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-400 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><CheckCircle2 size={16} /> Resolver</button>
-                                    <button onClick={() => setSuspensionModal({ ...c, fotoUrl: c.fotoUrl })} className="flex-1 bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><UserX size={16} /> Suspender</button>
+                                <div className="flex flex-wrap gap-2 pl-2">
+                                    <button onClick={() => handleCoordComplete(c)} className="flex-1 min-w-[120px] bg-gradient-to-r from-emerald-500 to-emerald-400 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><CheckCircle2 size={16} /> Resolver</button>
+                                    <button onClick={() => handleLibraryReferral(c)} className="flex-1 min-w-[120px] bg-gradient-to-r from-indigo-600 to-indigo-500 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><ImageIcon size={16} /> Encaminhar p/ Biblioteca</button>
+                                    <button onClick={() => setSuspensionModal({ ...c, fotoUrl: c.fotoUrl })} className="flex-1 min-w-[120px] bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1"><UserX size={16} /> Suspender</button>
                                 </div>
                             </div>
                         ))}

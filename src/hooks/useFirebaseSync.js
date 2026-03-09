@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { onSnapshot, doc, collection, enableNetwork, disableNetwork, query, orderBy, limit } from 'firebase/firestore';
 import { db, appId } from '../services/firebase';
 import { useAppContext } from '../contexts/AppContext';
@@ -10,16 +10,18 @@ export const useFirebaseSync = () => {
     const {
         setConfig, setAlunos, setActiveExits, setRecords,
         setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations,
-        isFirstLoad, prevCoordQueueRef
+        setTurmasExistentes, setStats, setCheckins, setWarnings
     } = useAppContext();
 
-    // Sistema Antizumbi (economia de banco no background / sleep do celular)
+    const isFirstLoad = useRef(true);
+    const prevCoordQueueRef = useRef([]);
+
+    // Sistema Antizumbi
     useEffect(() => {
         let lastTick = Date.now();
         const wakeUpCheck = setInterval(async () => {
             const now = Date.now();
             if (now - lastTick > 5000 && user) {
-                console.warn("DETECTOR DE COMA: Religando Firebase...");
                 try { await disableNetwork(db); await enableNetwork(db); } catch (e) { }
             }
             lastTick = now;
@@ -33,86 +35,75 @@ export const useFirebaseSync = () => {
 
         window.addEventListener("focus", handleNetworkChange);
         window.addEventListener("online", handleNetworkChange);
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === 'visible') handleNetworkChange();
-        });
-
         return () => {
             clearInterval(wakeUpCheck);
             window.removeEventListener("focus", handleNetworkChange);
             window.removeEventListener("online", handleNetworkChange);
-            document.removeEventListener("visibilitychange", handleNetworkChange);
         };
     }, [user]);
 
-    // Sync Global de Dados via Snapshot
+    // Sync Global
     useEffect(() => {
         if (!user) return;
 
-        const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'),
-            (d) => {
-                if (d.exists()) {
-                    const data = d.data();
-                    setConfig(prev => ({ ...prev, ...data }));
-                    if (data.alunosList) setAlunos(data.alunosList);
-                }
-            },
-            (err) => console.error("Erro Config Snapshot:", err)
-        );
+        // Solicitar permissão de notificação
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
 
-        const unsubExits = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'),
-            (s) => setActiveExits(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro Exits Snapshot:", err)
-        );
+        const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), (d) => {
+            if (d.exists()) {
+                const data = d.data();
+                setConfig(prev => ({ ...prev, ...data }));
+            }
+        });
 
-        const qHistory = query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), orderBy('rawTimestamp', 'desc'), limit(100));
-        const unsubHistory = onSnapshot(qHistory,
-            (s) => setRecords(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro History Snapshot:", err)
-        );
+        const qHistory = query(collection(db, 'artifacts', appId, 'public', 'data', 'history'), orderBy('rawTimestamp', 'desc'), limit(150));
+        const unsubHistory = onSnapshot(qHistory, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setRecords(data);
 
-        const unsubCoord = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'),
-            (s) => {
-                const newQueue = s.docs.map(d => ({ ...d.data(), id: d.id }));
-                if (isFirstLoad.current) { isFirstLoad.current = false; }
-                else if (userRole === 'admin') {
-                    const prevIds = prevCoordQueueRef.current.map(i => i.id);
-                    const addedItems = newQueue.filter(i => !prevIds.includes(i.id));
-                    if (addedItems.length > 0) {
-                        playEmergencySound();
-                        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
-                            try { addedItems.forEach(item => { new Notification("ALERTA: Aluno Retirado", { body: `${item.alunoNome} foi encaminhado para a coordenação.` }); }); } catch (err) { }
+            if (!isFirstLoad.current && Notification.permission === "granted") {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        const item = change.doc.data();
+                        if (item.categoria === 'ocorrencia' || item.detalhe?.includes('Retirado')) {
+                            new Notification("Nova Ocorrência", { body: `${item.alunoNome}: ${item.detalhe}` });
+                            playEmergencySound();
                         }
                     }
-                }
-                prevCoordQueueRef.current = newQueue; setCoordinationQueue(newQueue);
-            },
-            (err) => console.error("Erro Coord Snapshot:", err)
-        );
+                });
+            }
+            isFirstLoad.current = false;
+        });
 
-        const unsubLibrary = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'),
-            (s) => setLibraryQueue(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro Library Snapshot:", err)
-        );
+        const unsubAlunos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (s) => {
+            const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            setAlunos(data);
+            const turmas = [...new Set(data.map(a => a.turma))].filter(Boolean).sort();
+            setTurmasExistentes(turmas);
+        });
 
-        const unsubSuspensions = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'suspensions'),
-            (s) => setSuspensions(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro Suspensions Snapshot:", err)
-        );
+        const unsubCoord = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), (s) => {
+            const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            setCoordinationQueue(data);
+        });
 
-        const qAvisos = query(collection(db, 'artifacts', appId, 'public', 'data', 'avisos'), orderBy('rawTimestamp', 'desc'), limit(30));
-        const unsubAvisos = onSnapshot(qAvisos,
-            (s) => setAvisos(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro Avisos Snapshot:", err)
-        );
+        const unsubEval = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), (s) => {
+            setEvaluations(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
-        const qEval = query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), orderBy('rawTimestamp', 'desc'), limit(50));
-        const unsubEval = onSnapshot(qEval,
-            (s) => setEvaluations(s.docs.map(d => ({ ...d.data(), id: d.id }))),
-            (err) => console.error("Erro Evaluations Snapshot:", err)
-        );
+        const unsubExits = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'activeExits'), (s) => {
+            setActiveExits(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
-        return () => { unsubConfig(); unsubExits(); unsubHistory(); unsubCoord(); unsubLibrary(); unsubSuspensions(); unsubAvisos(); unsubEval(); };
-    }, [user, userRole, setConfig, setAlunos, setActiveExits, setRecords, setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations]);
-
+        return () => {
+            unsubConfig();
+            unsubHistory();
+            unsubAlunos();
+            unsubCoord();
+            unsubEval();
+            unsubExits();
+        };
+    }, [user, userRole, setConfig, setAlunos, setRecords, setCoordinationQueue, setEvaluations, setActiveExits, setTurmasExistentes]);
 };

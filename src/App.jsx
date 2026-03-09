@@ -34,6 +34,7 @@ import { AnaliseTab } from './views/Tabs/AnaliseTab';
 import { ConfigTab } from './views/Tabs/ConfigTab';
 import { PesquisaTab } from './views/Tabs/PesquisaTab';
 import { AvaliacaoTab } from './views/Tabs/AvaliacaoTab';
+import { StudentProfileModal } from './views/Modals/StudentProfileModal';
 
 const NavItem = ({ active, icon: Icon, label, onClick, badge, alert }) => (
   <button onClick={onClick} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-800'}`}>
@@ -143,6 +144,7 @@ const CoreApp = () => {
 
   const [currentTab, setCurrentTab] = useState('saidas');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState(null);
 
   if (!isAuthenticated) return <LoginView />;
 
@@ -192,13 +194,13 @@ const CoreApp = () => {
           </header>
 
           {currentTab === 'saidas' && <SaidasTab />}
-          {currentTab === 'ocorrencias' && userRole !== 'aluno' && <OcorrenciasTab />}
+          {currentTab === 'ocorrencias' && userRole !== 'aluno' && <OcorrenciasTab onStudentClick={setSelectedStudentProfile} />}
           {currentTab === 'historico' && <HistoricoTab />}
           {currentTab === 'coordenacao' && userRole !== 'aluno' && <CoordenacaoTab />}
           {currentTab === 'biblioteca' && userRole !== 'aluno' && <BibliotecaTab />}
           {currentTab === 'atrasos' && userRole !== 'aluno' && <AtrasosTab />}
           {currentTab === 'avisos' && <AvisosTab />}
-          {currentTab === 'analise' && userRole === 'admin' && <AnaliseTab />}
+          {currentTab === 'analise' && userRole === 'admin' && <AnaliseTab onStudentClick={setSelectedStudentProfile} />}
           {currentTab === 'config' && userRole === 'admin' && <ConfigTab />}
           {currentTab === 'pesquisa' && <PesquisaTab />}
           {currentTab === 'avaliacao' && userRole !== 'aluno' && <AvaliacaoTab />}

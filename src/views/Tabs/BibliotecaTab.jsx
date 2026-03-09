@@ -11,17 +11,45 @@ export const BibliotecaTab = () => {
     const { libraryQueue } = useAppContext();
     const { showNotification } = useModals();
 
-    const handleLibraryComplete = async (aluno) => {
+    const handleLibraryAction = async (aluno, actionType) => {
         try {
             const now = new Date(); const ts = now.toLocaleString('pt-PT'); const raw = now.getTime();
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
-                alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
-                categoria: 'saida', detalhe: 'Retorno da Biblioteca',
-                timestamp: ts, rawTimestamp: raw, professor: usernameInput
-            });
+
+            if (actionType === 'positivo') {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
+                    alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                    categoria: 'saida', detalhe: 'Retorno da Biblioteca (Positivo)',
+                    timestamp: ts, rawTimestamp: raw, professor: usernameInput
+                });
+                showNotification("Retorno confirmado!");
+            } else if (actionType === 'negativo') {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
+                    alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                    categoria: 'ocorrencia', detalhe: 'Ocorrência Extra: Desempenho Negativo na Biblioteca',
+                    timestamp: ts, rawTimestamp: raw, professor: usernameInput
+                });
+                showNotification("Ocorrência de desempenho registada!");
+            } else if (actionType === 'faltou') {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
+                    alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                    categoria: 'ocorrencia', detalhe: 'Ocorrência Extra: Não compareceu na Biblioteca',
+                    timestamp: ts, rawTimestamp: raw, professor: usernameInput
+                });
+                // Voltar para a coordenação
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), {
+                    alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                    motivo: "Não compareceu na Biblioteca",
+                    timestamp: ts, professor: usernameInput
+                });
+                showNotification("Falta registada e aluno enviado à Coordenação!");
+            }
+
+            // Remover da fila da biblioteca sempre
             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'libraryQueue', aluno.id));
-            showNotification("Retorno confirmado!");
-        } catch (e) { showNotification("Erro ao confirmar retorno."); }
+        } catch (e) {
+            console.error(e);
+            showNotification("Erro ao processar ação.");
+        }
     };
 
     return (
@@ -41,7 +69,17 @@ export const BibliotecaTab = () => {
                                         <p className="text-xs font-semibold text-indigo-900 mt-1 opacity-70">Enviado por: {c.professor}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => handleLibraryComplete(c)} className="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-3 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-indigo-200/50 hover:shadow-md hover:-translate-y-0.5"><CheckCircle2 size={16} /> Confirmar Retorno à Sala</button>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <button onClick={() => handleLibraryAction(c, 'positivo')} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-3 rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-1 border border-emerald-200/50 hover:shadow-sm">
+                                        <CheckCircle2 size={14} /> Retorno OK
+                                    </button>
+                                    <button onClick={() => handleLibraryAction(c, 'negativo')} className="bg-amber-100 hover:bg-amber-200 text-amber-700 py-3 rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-1 border border-amber-200/50 hover:shadow-sm">
+                                        <CheckCircle2 size={14} /> Desemp. Negativo
+                                    </button>
+                                    <button onClick={() => handleLibraryAction(c, 'faltou')} className="bg-rose-100 hover:bg-rose-200 text-rose-700 py-3 rounded-xl font-bold text-[10px] transition-all flex items-center justify-center gap-1 border border-rose-200/50 hover:shadow-sm">
+                                        <CheckCircle2 size={14} /> Não Apareceu
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
