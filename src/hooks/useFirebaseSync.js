@@ -9,8 +9,7 @@ export const useFirebaseSync = () => {
     const { user, userRole } = useAuth();
     const {
         setConfig, setAlunos, setActiveExits, setRecords,
-        setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations,
-        setTurmasExistentes, setStats, setCheckins, setWarnings
+        setCoordinationQueue, setLibraryQueue, setSuspensions, setAvisos, setEvaluations
     } = useAppContext();
 
     const isFirstLoad = useRef(true);
@@ -80,13 +79,16 @@ export const useFirebaseSync = () => {
         const unsubAlunos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (s) => {
             const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
             setAlunos(data);
-            const turmas = [...new Set(data.map(a => a.turma))].filter(Boolean).sort();
-            setTurmasExistentes(turmas);
         });
 
         const unsubCoord = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), (s) => {
             const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
             setCoordinationQueue(data);
+        });
+
+        const unsubLibrary = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), (s) => {
+            const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            setLibraryQueue(data);
         });
 
         const unsubEval = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), (s) => {
@@ -102,8 +104,9 @@ export const useFirebaseSync = () => {
             unsubHistory();
             unsubAlunos();
             unsubCoord();
+            unsubLibrary();
             unsubEval();
             unsubExits();
         };
-    }, [user, userRole, setConfig, setAlunos, setRecords, setCoordinationQueue, setEvaluations, setActiveExits, setTurmasExistentes]);
+    }, [user, userRole, setConfig, setAlunos, setRecords, setCoordinationQueue, setLibraryQueue, setEvaluations, setActiveExits]);
 };

@@ -1,5 +1,5 @@
-import React from 'react';
-import { DoorOpen, CheckCircle2, UserX, Image as ImageIcon } from 'lucide-react';
+import { useState } from 'react';
+import { DoorOpen, CheckCircle2, UserX, Image as ImageIcon, MessageSquare } from 'lucide-react';
 import { collection, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db, appId } from '../../services/firebase';
 import { useAppContext } from '../../contexts/AppContext';
@@ -10,13 +10,15 @@ export const CoordenacaoTab = () => {
     const { usernameInput } = useAuth();
     const { coordinationQueue, suspensions } = useAppContext();
     const { showNotification, setSuspensionModal, setEndSuspensionModal, setViewPhotoModal } = useModals();
+    const [observations, setObservations] = useState({});
 
     const handleCoordComplete = async (aluno) => {
         try {
+            const obs = observations[aluno.id] || '';
             const now = new Date(); const ts = now.toLocaleString('pt-PT'); const raw = now.getTime();
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
                 alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
-                categoria: 'coordenação', detalhe: `Atendimento Concluído. Motivo original: ${aluno.motivo}`,
+                categoria: 'coordenação', detalhe: `Atendimento Concluído. Motivo: ${aluno.motivo}. Obs: ${obs}`,
                 timestamp: ts, rawTimestamp: raw, professor: usernameInput,
                 fotoUrl: aluno.fotoUrl || null
             });
@@ -27,16 +29,18 @@ export const CoordenacaoTab = () => {
 
     const handleLibraryReferral = async (aluno) => {
         try {
+            const obs = observations[aluno.id] || '';
             const now = new Date(); const ts = now.toLocaleString('pt-PT'); const raw = now.getTime();
             // 1. Registrar no histórico
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'history'), {
                 alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
-                categoria: 'coordenação', detalhe: `Encaminhado à Biblioteca. Motivo original: ${aluno.motivo}`,
+                categoria: 'coordenação', detalhe: `Encaminhado à Biblioteca. Motivo: ${aluno.motivo}. Obs: ${obs}`,
                 timestamp: ts, rawTimestamp: raw, professor: usernameInput
             });
             // 2. Adicionar à fila da biblioteca
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'libraryQueue'), {
                 alunoId: aluno.alunoId, alunoNome: aluno.alunoNome, turma: aluno.turma,
+                motivo: aluno.motivo, observation: obs,
                 timestamp: ts, rawTimestamp: raw, professor: usernameInput
             });
             // 3. Remover da fila da coordenação
@@ -61,6 +65,18 @@ export const CoordenacaoTab = () => {
                                         <h4 className="font-extrabold text-sm text-amber-950 mb-1">{c.alunoNome}</h4>
                                         <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2"><span className="bg-amber-100 px-1.5 py-0.5 rounded-md">{c.turma}</span> • {c.timestamp}</p>
                                         <p className="text-xs font-semibold text-amber-900 bg-amber-100/50 p-2 rounded-xl mb-3"><span className="opacity-70 mr-1">Motivo:</span> {c.motivo}</p>
+
+                                        <div className="relative mb-3 group">
+                                            <div className="absolute top-3 left-3 text-amber-500">
+                                                <MessageSquare size={14} />
+                                            </div>
+                                            <textarea
+                                                placeholder="Adicionar observações..."
+                                                className="w-full pl-9 pr-3 py-2 bg-white/50 border border-amber-200 rounded-xl text-xs font-medium placeholder:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400 transition-all resize-none min-h-[60px]"
+                                                value={observations[c.id] || ''}
+                                                onChange={(e) => setObservations(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                            />
+                                        </div>
                                     </div>
                                     {c.fotoUrl && (
                                         <button
