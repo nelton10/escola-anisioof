@@ -8,6 +8,7 @@ export const ModalProvider = ({ children }) => {
     // Modals Data
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleteStudentsModal, setDeleteStudentsModal] = useState(false);
+    const [deleteTurma, setDeleteTurma] = useState(null);
     const [overtimeModal, setOvertimeModal] = useState(null);
     const [suspensionModal, setSuspensionModal] = useState(null);
     const [authReturnModal, setAuthReturnModal] = useState(null);
@@ -24,6 +25,7 @@ export const ModalProvider = ({ children }) => {
         showToast, showNotification,
         deleteConfirm, setDeleteConfirm,
         deleteStudentsModal, setDeleteStudentsModal,
+        deleteTurma, setDeleteTurma,
         overtimeModal, setOvertimeModal,
         suspensionModal, setSuspensionModal,
         authReturnModal, setAuthReturnModal,

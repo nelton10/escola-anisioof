@@ -29,9 +29,11 @@ export const PesquisaTab = () => {
                         ) : (
                             searchResults.map(a => (
                                 <div key={a.id} className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60 flex justify-between items-center shadow-sm hover:shadow-md hover:bg-white transition-all group">
-                                    <div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm shadow-indigo-200">
+                                            {a.turma}
+                                        </div>
                                         <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">{a.nome}</h4>
-                                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mt-1 bg-indigo-50 px-2 py-0.5 rounded-lg inline-block border border-indigo-100">{a.turma}</p>
                                     </div>
                                 </div>
                             ))

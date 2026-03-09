@@ -16,6 +16,7 @@ import { GlobalToast } from './components/ui/GlobalToast';
 import { EditRecordModal } from './components/modals/EditRecordModal';
 import { EndSuspensionModal } from './components/modals/EndSuspensionModal';
 import { DeleteConfirmModal } from './components/modals/DeleteConfirmModal';
+import { DeleteClassModal } from './components/modals/DeleteClassModal';
 import { SuspensionModal } from './components/modals/SuspensionModal';
 import { AuthReturnModal } from './components/modals/AuthReturnModal';
 import { OvertimeModal } from './components/modals/OvertimeModal';
@@ -212,6 +213,7 @@ const CoreApp = () => {
       <EditRecordModal />
       <EndSuspensionModal />
       <DeleteConfirmModal />
+      <DeleteClassModal />
       <SuspensionModal />
       <AuthReturnModal />
       <OvertimeModal />

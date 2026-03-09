@@ -54,6 +54,7 @@ export const useFirebaseSync = () => {
             if (d.exists()) {
                 const data = d.data();
                 setConfig(prev => ({ ...prev, ...data }));
+                if (data.alunosList) setAlunos(data.alunosList);
             }
         });
 
@@ -74,11 +75,6 @@ export const useFirebaseSync = () => {
                 });
             }
             isFirstLoad.current = false;
-        });
-
-        const unsubAlunos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (s) => {
-            const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
-            setAlunos(data);
         });
 
         const unsubCoord = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'coordinationQueue'), (s) => {
@@ -102,7 +98,6 @@ export const useFirebaseSync = () => {
         return () => {
             unsubConfig();
             unsubHistory();
-            unsubAlunos();
             unsubCoord();
             unsubLibrary();
             unsubEval();

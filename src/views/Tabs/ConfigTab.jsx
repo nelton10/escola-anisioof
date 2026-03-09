@@ -9,7 +9,7 @@ import { useModals } from '../../contexts/ModalContext';
 export const ConfigTab = () => {
     const { userRole } = useAuth();
     const { config, alunos, turmasExistentes } = useAppContext();
-    const { showNotification, setDeleteStudentsModal } = useModals();
+    const { showNotification, setDeleteStudentsModal, setDeleteTurma } = useModals();
 
     const [limitInput, setLimitInput] = useState(config.exitLimitMinutes?.toString() || '15');
     const [passAdmin, setPassAdmin] = useState(config.passwords?.admin || 'gestao');
@@ -243,6 +243,24 @@ export const ConfigTab = () => {
                         ))}
                         {searchStudent.length > 2 && filteredAlunos.length === 0 && <p className="text-center py-4 text-xs font-bold text-slate-400">Nenhum aluno encontrado.</p>}
                     </div>
+                </div>
+            </div>
+
+            {/* GESTÃO DE TURMAS */}
+            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-[2rem] border border-white shadow-xl shadow-slate-200/40 space-y-5">
+                <h3 className="text-sm font-extrabold flex items-center gap-2 text-slate-800 tracking-tight"><DatabaseBackup size={18} strokeWidth={2.5} /> Gestão de Turmas</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {turmasExistentes.map(t => (
+                        <div key={t} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200/60 group hover:bg-white transition-all">
+                            <span className="font-black text-slate-700 uppercase tracking-wider">{t}</span>
+                            <button
+                                onClick={() => setDeleteTurma(t)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black border border-rose-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Trash2 size={12} /> APAGAR TURMA
+                            </button>
+                        </div>
+                    ))}
                 </div>
             </div>
 
